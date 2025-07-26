@@ -562,10 +562,17 @@ download_enhanced_yacd() {
         exit 1
     fi
     
-    success "文件解压完成: $extracted_dir"
+    # 重命名目录为更简单的名称
+    local simple_dir="yacd-files"
+    if [ -d "$simple_dir" ]; then
+        rm -rf "$simple_dir"
+    fi
+    mv "$extracted_dir" "$simple_dir"
     
-    # 返回解压后的目录路径
-    echo "$temp_dir/$extracted_dir"
+    success "文件解压完成: $simple_dir"
+    
+    # 返回重命名后的目录路径
+    echo "$temp_dir/$simple_dir"
 }
 
 # 部署 Yacd 文件
@@ -581,11 +588,24 @@ deploy_yacd_files() {
         mkdir -p "$YACD_PATH"
     fi
     
-    # 复制文件
+    # 复制文件（使用更简单的方式）
     if [ -d "$source_dir/public" ]; then
-        cp -r "$source_dir/public"/* "$YACD_PATH/"
+        log "复制 public 目录内容..."
+        cp -r "$source_dir/public"/* "$YACD_PATH/" 2>/dev/null || {
+            # 如果复制失败，逐个复制文件
+            log "批量复制失败，尝试逐个复制..."
+            find "$source_dir/public" -type f -exec cp {} "$YACD_PATH/" \;
+        }
     else
-        cp -r "$source_dir"/* "$YACD_PATH/"
+        log "复制整个目录内容..."
+        # 使用 find 和 cp 的组合来避免文件名过长问题
+        find "$source_dir" -type f -exec cp {} "$YACD_PATH/" \; 2>/dev/null || {
+            log "复制失败，尝试使用 rsync..."
+            rsync -av "$source_dir/" "$YACD_PATH/" 2>/dev/null || {
+                error "所有复制方式都失败了"
+                return 1
+            }
+        }
     fi
     
     # 设置权限
