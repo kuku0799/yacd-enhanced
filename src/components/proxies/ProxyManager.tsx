@@ -28,6 +28,7 @@ type ProxyConfig = {
   protocol?: string;
   obfs?: string;
   username?: string;
+  alterId?: string;
 };
 
 type TabType = 'manual' | 'url' | 'text';
@@ -111,11 +112,60 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
 
     setLoading(true);
     try {
-      // 这里需要根据实际的Clash API来实现节点添加
-      // 由于Clash API的限制，这里只是示例
+      // 构建节点配置对象
+      const proxyConfigObj: any = {
+        name: proxyConfig.name,
+        type: proxyConfig.type,
+        server: proxyConfig.server,
+        port: parseInt(proxyConfig.port),
+      };
+
+      // 根据协议类型添加特定参数
+      switch (proxyConfig.type) {
+        case 'vmess':
+          if (proxyConfig.uuid) proxyConfigObj.uuid = proxyConfig.uuid;
+          if (proxyConfig.alterId) proxyConfigObj.alterId = parseInt(proxyConfig.alterId);
+          if (proxyConfig.security) proxyConfigObj.security = proxyConfig.security;
+          if (proxyConfig.network) proxyConfigObj.network = proxyConfig.network;
+          if (proxyConfig.sni) proxyConfigObj.sni = proxyConfig.sni;
+          if (proxyConfig.path) proxyConfigObj.path = proxyConfig.path;
+          if (proxyConfig.host) proxyConfigObj.host = proxyConfig.host;
+          break;
+        case 'vless':
+          if (proxyConfig.uuid) proxyConfigObj.uuid = proxyConfig.uuid;
+          if (proxyConfig.security) proxyConfigObj.security = proxyConfig.security;
+          if (proxyConfig.network) proxyConfigObj.network = proxyConfig.network;
+          if (proxyConfig.sni) proxyConfigObj.sni = proxyConfig.sni;
+          if (proxyConfig.path) proxyConfigObj.path = proxyConfig.path;
+          break;
+        case 'shadowsocks':
+          if (proxyConfig.password) proxyConfigObj.password = proxyConfig.password;
+          if (proxyConfig.method) proxyConfigObj.cipher = proxyConfig.method;
+          break;
+        case 'shadowsocksr':
+          if (proxyConfig.password) proxyConfigObj.password = proxyConfig.password;
+          if (proxyConfig.method) proxyConfigObj.cipher = proxyConfig.method;
+          if (proxyConfig.protocol) proxyConfigObj.protocol = proxyConfig.protocol;
+          if (proxyConfig.obfs) proxyConfigObj.obfs = proxyConfig.obfs;
+          break;
+        case 'trojan':
+          if (proxyConfig.password) proxyConfigObj.password = proxyConfig.password;
+          if (proxyConfig.sni) proxyConfigObj.sni = proxyConfig.sni;
+          break;
+        case 'http':
+        case 'socks5':
+          if (proxyConfig.username) proxyConfigObj.username = proxyConfig.username;
+          if (proxyConfig.password) proxyConfigObj.password = proxyConfig.password;
+          break;
+      }
+
+      // 添加节点到配置
+      await proxiesAPI.addProxyToConfig(apiConfig, proxyConfigObj);
+
+      // 添加节点到策略组
       await Promise.all(
         groupsToAdd.map(groupName =>
-          proxiesAPI.addProxyToGroup(apiConfig, groupName, proxyConfig.name)
+          proxiesAPI.addProxyToProxyGroup(apiConfig, groupName, proxyConfig.name)
         )
       );
       
@@ -141,6 +191,7 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
         username: '',
       });
     } catch (error) {
+      console.error('添加节点失败:', error);
       showMessage('error', t('add_proxy_failed'));
     } finally {
       setLoading(false);

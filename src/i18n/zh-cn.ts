@@ -142,4 +142,9 @@ export const data = {
   'tls1.2_ticket_auth': 'tls1.2_ticket_auth',
   'tls1.2_ticket_fastauth': 'tls1.2_ticket_fastauth',
   'verify_deflate': 'verify_deflate',
+  // 缺失的翻译键
+  '请填写必要的节点信息': '请填写必要的节点信息',
+  '请选择至少一个策略组': '请选择至少一个策略组',
+  '请输入订阅链接': '请输入订阅链接',
+  '请输入节点配置文本': '请输入节点配置文本',
 };

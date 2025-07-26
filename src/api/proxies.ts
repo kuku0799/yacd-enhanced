@@ -96,6 +96,99 @@ export async function addProxyToAllGroups(apiConfig, proxyName, groupNames) {
   return await Promise.all(promises);
 }
 
+// 添加节点到配置
+export async function addProxyToConfig(apiConfig, proxyConfig) {
+  try {
+    // 获取当前配置
+    const { url, init } = getURLAndInit(apiConfig);
+    const configResponse = await fetch(url + '/configs', init);
+    const currentConfig = await configResponse.json();
+    
+    // 确保 proxies 数组存在
+    if (!currentConfig.proxies) {
+      currentConfig.proxies = [];
+    }
+    
+    // 添加新节点
+    currentConfig.proxies.push(proxyConfig);
+    
+    // 更新配置
+    const updateResponse = await fetch(url + '/configs', {
+      ...init,
+      method: 'PUT',
+      body: JSON.stringify(currentConfig),
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error('配置更新失败');
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('添加节点到配置失败:', error);
+    throw error;
+  }
+}
+
+// 添加节点到策略组
+export async function addProxyToProxyGroup(apiConfig, groupName, proxyName) {
+  try {
+    // 获取当前配置
+    const { url, init } = getURLAndInit(apiConfig);
+    const configResponse = await fetch(url + '/configs', init);
+    const currentConfig = await configResponse.json();
+    
+    // 找到指定的策略组
+    const proxyGroups = currentConfig['proxy-groups'] || [];
+    const targetGroup = proxyGroups.find(group => group.name === groupName);
+    
+    if (!targetGroup) {
+      throw new Error(`策略组 ${groupName} 不存在`);
+    }
+    
+    // 确保 proxies 数组存在
+    if (!targetGroup.proxies) {
+      targetGroup.proxies = [];
+    }
+    
+    // 检查节点是否已存在
+    if (!targetGroup.proxies.includes(proxyName)) {
+      targetGroup.proxies.push(proxyName);
+    }
+    
+    // 更新配置
+    const updateResponse = await fetch(url + '/configs', {
+      ...init,
+      method: 'PUT',
+      body: JSON.stringify(currentConfig),
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error('策略组更新失败');
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('添加节点到策略组失败:', error);
+    throw error;
+  }
+}
+
+// 获取所有策略组名称
+export async function getProxyGroups(apiConfig) {
+  try {
+    const { url, init } = getURLAndInit(apiConfig);
+    const configResponse = await fetch(url + '/configs', init);
+    const currentConfig = await configResponse.json();
+    
+    const proxyGroups = currentConfig['proxy-groups'] || [];
+    return proxyGroups.map(group => group.name);
+  } catch (error) {
+    console.error('获取策略组失败:', error);
+    return [];
+  }
+}
+
 export async function parseSubscriptionUrl(url) {
   try {
     const response = await fetch(url);
