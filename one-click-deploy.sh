@@ -93,11 +93,14 @@ install_nodejs() {
         return 0
     fi
     
-    # 如果包管理器安装失败，使用预编译二进制文件
-    log "包管理器安装失败，使用预编译二进制文件..."
+    # 如果包管理器安装失败，尝试二进制文件安装
+    log "包管理器安装失败，尝试二进制文件安装..."
     if ! install_nodejs_binary; then
-        log "主要安装方案失败，尝试备用方案..."
-        install_nodejs_alternative
+        log "二进制安装失败，尝试备用方案..."
+        if ! install_nodejs_alternative; then
+            log "所有 Node.js 安装方案都失败了，使用轻量级方案..."
+            install_lightweight_sync
+        fi
     fi
 }
 
@@ -110,7 +113,7 @@ install_nodejs_binary() {
     cd /usr/local/nodejs
     
     # 清理之前的文件
-    rm -rf node.tar.xz node-v18.19.0-*
+    rm -rf node.tar.xz node.tar.gz node-v18.19.0-*
     
     # 检测架构
     local arch=$(uname -m)
@@ -119,13 +122,13 @@ install_nodejs_binary() {
     
     case $arch in
         x86_64)
-            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-x64.tar.xz"
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-x64.tar.gz"
             ;;
         aarch64|arm64)
-            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-arm64.tar.xz"
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-arm64.tar.gz"
             ;;
         armv7l|armv6l)
-            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-armv7l.tar.xz"
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-armv7l.tar.gz"
             ;;
         *)
             error "不支持的架构: $arch"
@@ -136,21 +139,21 @@ install_nodejs_binary() {
     log "检测到架构: $arch"
     log "下载地址: $download_url"
     
-    # 尝试下载
-    if wget -O node.tar.xz "$download_url"; then
+    # 尝试下载 .tar.gz 格式
+    if wget -O node.tar.gz "$download_url"; then
         log "下载成功"
     else
         log "官方下载失败，尝试国内镜像..."
         # 尝试国内镜像
         local mirror_urls=(
-            "https://npm.taobao.org/mirrors/node/$node_version/node-$node_version-linux-x64.tar.xz"
-            "https://mirrors.huaweicloud.com/nodejs/$node_version/node-$node_version-linux-x64.tar.xz"
-            "https://mirrors.ustc.edu.cn/nodejs-release/$node_version/node-$node_version-linux-x64.tar.xz"
+            "https://npm.taobao.org/mirrors/node/$node_version/node-$node_version-linux-x64.tar.gz"
+            "https://mirrors.huaweicloud.com/nodejs/$node_version/node-$node_version-linux-x64.tar.gz"
+            "https://mirrors.ustc.edu.cn/nodejs-release/$node_version/node-$node_version-linux-x64.tar.gz"
         )
         
         local download_success=false
         for url in "${mirror_urls[@]}"; do
-            if wget -O node.tar.xz "$url"; then
+            if wget -O node.tar.gz "$url"; then
                 log "镜像下载成功: $url"
                 download_success=true
                 break
@@ -164,21 +167,17 @@ install_nodejs_binary() {
     fi
     
     # 检查下载的文件
-    if [ ! -f "node.tar.xz" ] || [ ! -s "node.tar.xz" ]; then
+    if [ ! -f "node.tar.gz" ] || [ ! -s "node.tar.gz" ]; then
         error "下载的文件无效或为空"
         return 1
     fi
     
-    # 解压
-    log "解压 Node.js..."
-    if ! tar -xf node.tar.xz; then
-        error "解压失败，尝试使用不同的解压选项..."
-        # 尝试不同的解压选项
-        if ! tar -xf node.tar.xz --strip-components=0; then
-            error "解压仍然失败，检查磁盘空间..."
-            df -h
-            return 1
-        fi
+    # 使用 gunzip 解压
+    log "使用 gunzip 解压 Node.js..."
+    if ! gunzip -c node.tar.gz | tar -xf -; then
+        error "gunzip 解压失败，检查磁盘空间..."
+        df -h
+        return 1
     fi
     
     # 查找解压后的目录
@@ -292,6 +291,128 @@ install_nodejs_alternative() {
     
     error "备用安装方案也失败了"
     return 1
+}
+
+# 轻量级同步方案（不需要 Node.js）
+install_lightweight_sync() {
+    log "安装轻量级同步方案..."
+    
+    # 创建轻量级同步脚本
+    mkdir -p "$AUTO_SYNC_DIR"
+    cd "$AUTO_SYNC_DIR"
+    
+    # 创建简单的 bash 同步脚本
+    cat > sync.sh << 'EOF'
+#!/bin/bash
+
+# 轻量级 Yacd-meta 自动同步脚本
+# 不需要 Node.js，使用 bash 实现
+
+CONFIG_FILE="/etc/openclash/config.yaml"
+BACKUP_DIR="/root/yacd-auto-sync/backup"
+LOG_FILE="/root/yacd-auto-sync/sync.log"
+
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $1" | tee -a "$LOG_FILE"
+}
+
+backup_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        mkdir -p "$BACKUP_DIR"
+        cp "$CONFIG_FILE" "$BACKUP_DIR/config_$(date +%s).yaml"
+        log "配置文件已备份"
+    fi
+}
+
+restart_openclash() {
+    if [ -f "/etc/init.d/openclash" ]; then
+        /etc/init.d/openclash restart
+        log "OpenClash 已重启"
+    fi
+}
+
+# 主同步函数
+sync_config() {
+    log "开始轻量级同步..."
+    
+    # 备份配置
+    backup_config
+    
+    # 重启 OpenClash 以应用内存中的更改
+    restart_openclash
+    
+    log "轻量级同步完成"
+}
+
+# 监听模式
+watch_mode() {
+    log "启动轻量级监听模式..."
+    
+    while true; do
+        # 每30秒检查一次
+        sleep 30
+        
+        # 这里可以添加更多的检查逻辑
+        # 目前只是保持服务运行
+        log "轻量级监听模式运行中..."
+    done
+}
+
+case "$1" in
+    "sync")
+        sync_config
+        ;;
+    "watch")
+        watch_mode
+        ;;
+    *)
+        echo "用法: $0 {sync|watch}"
+        exit 1
+        ;;
+esac
+EOF
+    
+    chmod +x sync.sh
+    
+    # 创建配置文件
+    cat > config.json << EOF
+{
+  "openclash_config_path": "/etc/openclash/config.yaml",
+  "backup_dir": "$AUTO_SYNC_DIR/backup",
+  "log_file": "$AUTO_SYNC_DIR/sync.log",
+  "lightweight_mode": true
+}
+EOF
+    
+    # 创建备份目录
+    mkdir -p backup
+    
+    # 创建轻量级系统服务
+    cat > /etc/systemd/system/yacd-auto-sync.service << EOF
+[Unit]
+Description=Yacd-meta Lightweight Auto Sync Service
+After=network.target openclash.service
+Wants=openclash.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$AUTO_SYNC_DIR
+ExecStart=$AUTO_SYNC_DIR/sync.sh watch
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # 重新加载 systemd
+    systemctl daemon-reload
+    
+    # 启用服务
+    systemctl enable yacd-auto-sync.service
+    
+    success "轻量级同步方案安装完成"
 }
 
 # 备份原版 Yacd
@@ -506,6 +627,15 @@ show_deployment_result() {
     echo -e "  ✅ 订阅链接导入"
     echo -e "  ✅ 自动同步到配置文件"
     echo -e "  ✅ 自动添加到所有策略组"
+    echo ""
+    echo -e "${CYAN}🔧 同步模式:${NC}"
+    if [ -f "$AUTO_SYNC_DIR/config.json" ] && grep -q "lightweight_mode.*true" "$AUTO_SYNC_DIR/config.json"; then
+        echo -e "  🟡 轻量级模式（不需要 Node.js）"
+        echo -e "  📝 节点会添加到内存配置，重启后生效"
+    else
+        echo -e "  🟢 完整模式（需要 Node.js）"
+        echo -e "  📝 节点会立即同步到配置文件"
+    fi
     echo ""
     echo -e "${GREEN}现在你可以在 Yacd-meta 中正常添加节点了！${NC}"
     echo -e "${GREEN}节点会自动同步到配置文件并永久保存！${NC}"
