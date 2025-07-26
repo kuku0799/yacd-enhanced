@@ -245,27 +245,31 @@ install_js_yaml() {
 install_nodejs_alternative() {
     log "尝试备用 Node.js 安装方案..."
     
+    # 清理空间
+    rm -rf /tmp/node* /tmp/yacd*
+    
     # 创建简单的 Node.js 环境
     mkdir -p /usr/local/nodejs/bin
     cd /usr/local/nodejs
     
-    # 下载预编译的 Node.js 二进制文件
+    # 尝试更小的 Node.js 版本
     local arch=$(uname -m)
+    local node_version="v16.20.2"  # 使用更小的版本
     local node_url=""
     
     case $arch in
         x86_64)
-            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-x64.tar.gz"
+            node_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-x64.tar.gz"
             ;;
         aarch64|arm64)
-            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-arm64.tar.gz"
+            node_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-arm64.tar.gz"
             ;;
         *)
-            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-x64.tar.gz"
+            node_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-x64.tar.gz"
             ;;
     esac
     
-    log "下载备用 Node.js: $node_url"
+    log "下载备用 Node.js (v16): $node_url"
     
     if wget -O node.tar.gz "$node_url"; then
         log "备用下载成功"
@@ -275,7 +279,7 @@ install_nodejs_alternative() {
             log "备用解压成功"
             
             # 查找并复制文件
-            local node_dir=$(find . -name "node-v18.19.0-*" -type d | head -1)
+            local node_dir=$(find . -name "node-$node_version-*" -type d | head -1)
             if [ -n "$node_dir" ] && [ -d "$node_dir" ]; then
                 cp -r "$node_dir"/* /usr/local/nodejs/
                 ln -sf /usr/local/nodejs/bin/node /usr/bin/node
@@ -289,13 +293,55 @@ install_nodejs_alternative() {
         fi
     fi
     
-    error "备用安装方案也失败了"
+    # 如果还是失败，尝试最小的二进制文件
+    log "尝试最小化 Node.js 安装..."
+    install_minimal_nodejs
+}
+
+# 最小化 Node.js 安装
+install_minimal_nodejs() {
+    log "安装最小化 Node.js..."
+    
+    # 只下载必要的二进制文件
+    local arch=$(uname -m)
+    local node_binary=""
+    
+    case $arch in
+        x86_64)
+            node_binary="https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-x64/bin/node"
+            ;;
+        aarch64|arm64)
+            node_binary="https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-arm64/bin/node"
+            ;;
+        *)
+            node_binary="https://nodejs.org/dist/v16.20.2/node-v16.20.2-linux-x64/bin/node"
+            ;;
+    esac
+    
+    log "下载 Node.js 二进制文件: $node_binary"
+    
+    if wget -O /usr/bin/node "$node_binary"; then
+        chmod +x /usr/bin/node
+        if node --version &> /dev/null; then
+            log "最小化 Node.js 安装成功: $(node --version)"
+            return 0
+        fi
+    fi
+    
+    error "最小化安装也失败了"
     return 1
 }
 
 # 轻量级同步方案（不需要 Node.js）
 install_lightweight_sync() {
     log "安装轻量级同步方案..."
+    
+    # 检查磁盘空间
+    local available_space=$(df /tmp | awk 'NR==2 {print $4}')
+    if [ "$available_space" -lt 50000 ]; then
+        warn "磁盘空间不足，清理临时文件..."
+        rm -rf /tmp/node* /tmp/yacd*
+    fi
     
     # 创建轻量级同步脚本
     mkdir -p "$AUTO_SYNC_DIR"
@@ -387,8 +433,13 @@ EOF
     # 创建备份目录
     mkdir -p backup
     
-    # 创建轻量级系统服务
-    cat > /etc/systemd/system/yacd-auto-sync.service << EOF
+    # 检查 systemd 目录是否存在
+    if [ ! -d "/etc/systemd/system" ]; then
+        warn "systemd 目录不存在，使用 init.d 脚本"
+        create_initd_script
+    else
+        # 创建轻量级系统服务
+        cat > /etc/systemd/system/yacd-auto-sync.service << EOF
 [Unit]
 Description=Yacd-meta Lightweight Auto Sync Service
 After=network.target openclash.service
@@ -405,14 +456,52 @@ RestartSec=10
 [Install]
 WantedBy=multi-user.target
 EOF
-    
-    # 重新加载 systemd
-    systemctl daemon-reload
-    
-    # 启用服务
-    systemctl enable yacd-auto-sync.service
+        
+        # 重新加载 systemd
+        systemctl daemon-reload
+        
+        # 启用服务
+        systemctl enable yacd-auto-sync.service
+    fi
     
     success "轻量级同步方案安装完成"
+}
+
+# 创建 init.d 脚本（用于不支持 systemd 的系统）
+create_initd_script() {
+    log "创建 init.d 脚本..."
+    
+    cat > /etc/init.d/yacd-auto-sync << EOF
+#!/bin/sh /etc/rc.common
+
+START=95
+STOP=15
+
+start() {
+    echo "启动 Yacd-meta 自动同步服务..."
+    /root/yacd-auto-sync/sync.sh watch &
+    echo \$! > /var/run/yacd-auto-sync.pid
+}
+
+stop() {
+    echo "停止 Yacd-meta 自动同步服务..."
+    if [ -f /var/run/yacd-auto-sync.pid ]; then
+        kill \$(cat /var/run/yacd-auto-sync.pid) 2>/dev/null
+        rm -f /var/run/yacd-auto-sync.pid
+    fi
+}
+
+restart() {
+    stop
+    sleep 2
+    start
+}
+EOF
+    
+    chmod +x /etc/init.d/yacd-auto-sync
+    
+    # 启用服务
+    /etc/init.d/yacd-auto-sync enable
 }
 
 # 备份原版 Yacd
