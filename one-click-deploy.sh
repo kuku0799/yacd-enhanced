@@ -609,7 +609,9 @@ download_enhanced_yacd() {
     log "检查 dist 目录: $temp_dir/$simple_dir/dist"
     if [ -d "$temp_dir/$simple_dir/dist" ]; then
         log "找到 dist 目录，使用 dist 目录内容"
+        log "准备返回路径: $temp_dir/$simple_dir/dist"
         echo "$temp_dir/$simple_dir/dist"
+        log "路径已返回"
     else
         log "dist 目录不存在"
         log "检查 public 目录: $temp_dir/$simple_dir/public"
@@ -622,6 +624,8 @@ download_enhanced_yacd() {
             echo "$temp_dir/$simple_dir"
         fi
     fi
+    
+    log "download_enhanced_yacd 函数即将结束"
 }
 
 # 部署 Yacd 文件
