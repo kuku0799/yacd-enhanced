@@ -604,8 +604,17 @@ download_enhanced_yacd() {
     log "解压目录内容:"
     ls -la "$temp_dir/$simple_dir" 2>/dev/null || log "无法列出解压目录内容"
     
-    # 返回重命名后的目录路径
-    echo "$temp_dir/$simple_dir"
+    # 检查是否有 dist 目录
+    if [ -d "$temp_dir/$simple_dir/dist" ]; then
+        log "找到 dist 目录，使用 dist 目录内容"
+        echo "$temp_dir/$simple_dir/dist"
+    elif [ -d "$temp_dir/$simple_dir/public" ]; then
+        log "找到 public 目录，使用 public 目录内容"
+        echo "$temp_dir/$simple_dir/public"
+    else
+        log "未找到 dist 或 public 目录，使用整个目录"
+        echo "$temp_dir/$simple_dir"
+    fi
 }
 
 # 部署 Yacd 文件
