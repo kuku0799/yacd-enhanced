@@ -136,8 +136,12 @@ cleanup_old_versions() {
     rm -rf /tmp/main.zip
     rm -rf /tmp/dist.zip
     
-    # 重新加载 systemd
-    systemctl daemon-reload
+    # 重新加载服务（兼容 systemd 和 init.d）
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl daemon-reload
+    elif command -v /etc/init.d/openclash >/dev/null 2>&1; then
+        /etc/init.d/openclash reload
+    fi
     
     success "旧版本清理完成"
 }
@@ -205,9 +209,27 @@ log() {
 
 # 检查 OpenClash 服务
 check_openclash() {
-    if ! systemctl is-active --quiet openclash; then
+    local service_running=false
+    
+    # 检查 systemd 服务
+    if command -v systemctl >/dev/null 2>&1; then
+        if systemctl is-active --quiet openclash; then
+            service_running=true
+        fi
+    # 检查 init.d 服务
+    elif [ -f "/etc/init.d/openclash" ]; then
+        if /etc/init.d/openclash status >/dev/null 2>&1; then
+            service_running=true
+        fi
+    fi
+    
+    if [ "$service_running" = false ]; then
         log "ERROR: OpenClash 服务未运行"
-        systemctl restart openclash
+        if command -v systemctl >/dev/null 2>&1; then
+            systemctl restart openclash
+        elif [ -f "/etc/init.d/openclash" ]; then
+            /etc/init.d/openclash restart
+        fi
     fi
 }
 
@@ -238,8 +260,9 @@ EOF
 
     chmod +x /usr/local/bin/yacd-enhanced/monitor.sh
     
-    # 创建监控服务
-    cat > /etc/systemd/system/yacd-enhanced-monitor.service << EOF
+    # 创建监控服务（兼容 systemd 和 init.d）
+    if [ -d "/etc/systemd/system" ]; then
+        cat > /etc/systemd/system/yacd-enhanced-monitor.service << EOF
 [Unit]
 Description=Yacd Enhanced Monitor Service
 After=network.target
@@ -256,11 +279,38 @@ StandardError=append:/var/log/yacd-enhanced/monitor.log
 [Install]
 WantedBy=multi-user.target
 EOF
+        systemctl daemon-reload
+        systemctl enable yacd-enhanced-monitor
+        systemctl start yacd-enhanced-monitor
+    else
+        # 创建 init.d 脚本
+        cat > /etc/init.d/yacd-enhanced-monitor << 'EOF'
+#!/bin/sh /etc/rc.common
 
-    # 启用并启动监控服务
-    systemctl daemon-reload
-    systemctl enable yacd-enhanced-monitor
-    systemctl start yacd-enhanced-monitor
+START=99
+STOP=10
+
+start() {
+    /usr/local/bin/yacd-enhanced/monitor.sh &
+    echo $! > /var/run/yacd-enhanced-monitor.pid
+}
+
+stop() {
+    if [ -f /var/run/yacd-enhanced-monitor.pid ]; then
+        kill $(cat /var/run/yacd-enhanced-monitor.pid)
+        rm -f /var/run/yacd-enhanced-monitor.pid
+    fi
+}
+
+restart() {
+    stop
+    start
+}
+EOF
+        chmod +x /etc/init.d/yacd-enhanced-monitor
+        /etc/init.d/yacd-enhanced-monitor enable
+        /etc/init.d/yacd-enhanced-monitor start
+    fi
     
     success "轻量级监控设置完成"
 }
