@@ -605,15 +605,22 @@ download_enhanced_yacd() {
     ls -la "$temp_dir/$simple_dir" 2>/dev/null || log "无法列出解压目录内容"
     
     # 检查是否有 dist 目录
+    log "检查目录结构..."
+    log "检查 dist 目录: $temp_dir/$simple_dir/dist"
     if [ -d "$temp_dir/$simple_dir/dist" ]; then
         log "找到 dist 目录，使用 dist 目录内容"
         echo "$temp_dir/$simple_dir/dist"
-    elif [ -d "$temp_dir/$simple_dir/public" ]; then
-        log "找到 public 目录，使用 public 目录内容"
-        echo "$temp_dir/$simple_dir/public"
     else
-        log "未找到 dist 或 public 目录，使用整个目录"
-        echo "$temp_dir/$simple_dir"
+        log "dist 目录不存在"
+        log "检查 public 目录: $temp_dir/$simple_dir/public"
+        if [ -d "$temp_dir/$simple_dir/public" ]; then
+            log "找到 public 目录，使用 public 目录内容"
+            echo "$temp_dir/$simple_dir/public"
+        else
+            log "public 目录也不存在"
+            log "未找到 dist 或 public 目录，使用整个目录"
+            echo "$temp_dir/$simple_dir"
+        fi
     fi
 }
 
