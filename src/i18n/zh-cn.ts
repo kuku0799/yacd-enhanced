@@ -80,7 +80,9 @@ export const data = {
   internel: '内部链接',
   // 新增节点管理相关翻译
   'add_proxy': '添加节点',
+  'remove_proxy': '删除节点',
   'add_proxy_to_all_groups': '添加到所有策略组',
+  'remove_proxy_from_all_groups': '从所有策略组删除',
   'proxy_name': '节点名称',
   'proxy_type': '节点类型',
   'proxy_server': '服务器地址',
@@ -103,6 +105,8 @@ export const data = {
   'parse_proxy': '解析节点',
   'add_proxy_success': '节点添加成功',
   'add_proxy_failed': '节点添加失败',
+  'remove_proxy_success': '节点删除成功',
+  'remove_proxy_failed': '节点删除失败',
   'parse_proxy_success': '解析成功',
   'parse_proxy_failed': '解析失败',
   'select_groups': '选择策略组',

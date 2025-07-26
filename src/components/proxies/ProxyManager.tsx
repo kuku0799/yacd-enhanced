@@ -1,12 +1,13 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Link, FileText } from 'react-feather';
+import { Plus, Link, FileText, Trash2 } from 'react-feather';
 
 import * as proxiesAPI from '~/api/proxies';
 import { connect, useStoreActions } from '~/components/StateProvider';
 import { getClashAPIConfig } from '~/store/app';
 import { getProxyGroupNames, fetchProxies } from '~/store/proxies';
 import type { State } from '~/store/types';
+import ProxyRemover from './ProxyRemover';
 
 import s from './ProxyManager.module.scss';
 
@@ -30,7 +31,7 @@ type ProxyConfig = {
   username?: string;
 };
 
-type TabType = 'manual' | 'url' | 'text';
+type TabType = 'manual' | 'url' | 'text' | 'remove';
 
 function ProxyManager({ dispatch, groupNames, apiConfig }) {
   const { t } = useTranslation();
@@ -445,40 +446,49 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
     </div>
   );
 
-  return (
-    <div className={s.container}>
-      <div className={s.tabs}>
-        <button
-          className={`${s.tab} ${activeTab === 'manual' ? s.active : ''}`}
-          onClick={() => setActiveTab('manual')}
-        >
-          {t('add_proxy')}
-        </button>
-        <button
-          className={`${s.tab} ${activeTab === 'url' ? s.active : ''}`}
-          onClick={() => setActiveTab('url')}
-        >
-          {t('import_from_url')}
-        </button>
-        <button
-          className={`${s.tab} ${activeTab === 'text' ? s.active : ''}`}
-          onClick={() => setActiveTab('text')}
-        >
-          {t('import_from_text')}
-        </button>
-      </div>
+        return (
+        <div className={s.container}>
+          <div className={s.tabs}>
+            <button
+              className={`${s.tab} ${activeTab === 'manual' ? s.active : ''}`}
+              onClick={() => setActiveTab('manual')}
+            >
+              {t('add_proxy')}
+            </button>
+            <button
+              className={`${s.tab} ${activeTab === 'url' ? s.active : ''}`}
+              onClick={() => setActiveTab('url')}
+            >
+              {t('import_from_url')}
+            </button>
+            <button
+              className={`${s.tab} ${activeTab === 'text' ? s.active : ''}`}
+              onClick={() => setActiveTab('text')}
+            >
+              {t('import_from_text')}
+            </button>
+            <button
+              className={`${s.tab} ${activeTab === 'remove' ? s.active : ''}`}
+              onClick={() => setActiveTab('remove')}
+              style={{ color: '#f44336' }}
+            >
+              <Trash2 size={16} />
+              删除节点
+            </button>
+          </div>
 
-      {message && (
-        <div className={`${s.message} ${s[message.type]}`}>
-          {message.text}
+          {message && (
+            <div className={`${s.message} ${s[message.type]}`}>
+              {message.text}
+            </div>
+          )}
+
+          {activeTab === 'manual' && renderManualForm()}
+          {activeTab === 'url' && renderUrlForm()}
+          {activeTab === 'text' && renderTextForm()}
+          {activeTab === 'remove' && <ProxyRemover dispatch={dispatch} groupNames={groupNames} apiConfig={apiConfig} />}
         </div>
-      )}
-
-      {activeTab === 'manual' && renderManualForm()}
-      {activeTab === 'url' && renderUrlForm()}
-      {activeTab === 'text' && renderTextForm()}
-    </div>
-  );
+      );
 }
 
 const mapState = (s: State) => ({

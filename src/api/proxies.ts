@@ -96,6 +96,24 @@ export async function addProxyToAllGroups(apiConfig, proxyName, groupNames) {
   return await Promise.all(promises);
 }
 
+export async function removeProxyFromGroup(apiConfig, groupName, proxyName) {
+  const { url, init } = getURLAndInit(apiConfig);
+  const body = { name: proxyName };
+  const fullURL = `${url}${endpoint}/${encodeURIComponent(groupName)}`;
+  return await fetch(fullURL, {
+    ...init,
+    method: 'DELETE',
+    body: JSON.stringify(body),
+  });
+}
+
+export async function removeProxyFromAllGroups(apiConfig, proxyName, groupNames) {
+  const promises = groupNames.map(groupName => 
+    removeProxyFromGroup(apiConfig, groupName, proxyName)
+  );
+  return await Promise.all(promises);
+}
+
 export async function parseSubscriptionUrl(url) {
   try {
     const response = await fetch(url);
