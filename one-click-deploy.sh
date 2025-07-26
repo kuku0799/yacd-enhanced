@@ -630,12 +630,8 @@ download_enhanced_yacd() {
     
     log "download_enhanced_yacd 函数即将结束"
     log "当前工作目录: $(pwd)"
-    # 检查当前用户（避免 whoami 命令问题）
-    if command -v whoami >/dev/null 2>&1; then
-        log "当前用户: $(whoami)"
-    else
-        log "当前用户: root"
-    fi
+    # 移除可能有问题的 whoami 命令
+    log "函数即将返回"
 }
 
 # 部署 Yacd 文件
@@ -900,6 +896,7 @@ main() {
     
     # 下载并部署
     log "开始调用 download_enhanced_yacd 函数..."
+    download_enhanced_yacd
     local source_dir=$(download_enhanced_yacd)
     log "download_enhanced_yacd 函数调用完成"
     log "获取到源目录: $source_dir"
