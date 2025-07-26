@@ -471,6 +471,9 @@ EOF
 create_initd_script() {
     log "创建 init.d 脚本..."
     
+    # 确保 /etc/init.d 目录存在
+    mkdir -p /etc/init.d
+    
     cat > /etc/init.d/yacd-auto-sync << EOF
 #!/bin/sh /etc/rc.common
 
@@ -502,6 +505,8 @@ EOF
     
     # 启用服务
     /etc/init.d/yacd-auto-sync enable
+    
+    log "init.d 脚本创建完成"
 }
 
 # 备份原版 Yacd
