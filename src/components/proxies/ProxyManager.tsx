@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Link, FileText } from 'react-feather';
 
 import * as proxiesAPI from '~/api/proxies';
+import * as providerAPI from '~/api/provider';
 import { connect, useStoreActions } from '~/components/StateProvider';
 import { getClashAPIConfig } from '~/store/app';
 import { getProxyGroupNames, fetchProxies } from '~/store/proxies';
@@ -159,15 +160,16 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
           break;
       }
 
-      // 添加节点到配置
-      await proxiesAPI.addProxyToConfig(apiConfig, proxyConfigObj);
-
-      // 添加节点到策略组
-      await Promise.all(
-        groupsToAdd.map(groupName =>
-          proxiesAPI.addProxyToProxyGroup(apiConfig, groupName, proxyConfig.name)
-        )
-      );
+      // 使用 Provider API 添加节点
+      try {
+        await providerAPI.addProviderProxy(proxyConfigObj);
+        showMessage('success', t('add_proxy_success') + ' (Provider)');
+      } catch (providerError) {
+        console.error('Provider API 失败，尝试备用方法:', providerError);
+        // 备用方法：使用原来的 Clash API
+        await proxiesAPI.addProxyToConfigFile(apiConfig, proxyConfigObj, groupsToAdd);
+        showMessage('success', t('add_proxy_success') + ' (Clash API)');
+      }
       
       await dispatch(fetchProxies(apiConfig));
       showMessage('success', t('add_proxy_success'));
@@ -241,6 +243,18 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
       setLoading(false);
     }
   }, [proxyText, t]);
+
+  const handleExportConfig = useCallback(async () => {
+    setLoading(true);
+    try {
+      await proxiesAPI.exportConfigAsYaml(apiConfig);
+      showMessage('success', t('export_config_success'));
+    } catch (error) {
+      showMessage('error', t('export_config_failed'));
+    } finally {
+      setLoading(false);
+    }
+  }, [apiConfig, t]);
 
   const renderManualForm = () => (
     <div className={s.form}>
@@ -422,6 +436,13 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
               {t('add_proxy')}
             </>
           )}
+        </button>
+        <button
+          className={`${s.button} ${s.secondary}`}
+          onClick={handleExportConfig}
+          disabled={loading}
+        >
+          {t('export_config')}
         </button>
       </div>
     </div>

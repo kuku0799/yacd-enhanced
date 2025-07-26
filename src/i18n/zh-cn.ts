@@ -147,4 +147,8 @@ export const data = {
   '请选择至少一个策略组': '请选择至少一个策略组',
   '请输入订阅链接': '请输入订阅链接',
   '请输入节点配置文本': '请输入节点配置文本',
+  'export_config': '导出配置文件',
+  'export_config_success': '配置文件导出成功',
+  'export_config_failed': '导出配置失败',
+  'adding': '添加中...',
 };

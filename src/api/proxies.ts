@@ -130,6 +130,88 @@ export async function addProxyToConfig(apiConfig, proxyConfig) {
   }
 }
 
+// 新的：直接修改配置文件的方法
+export async function addProxyToConfigFile(apiConfig, proxyConfig, groupNames) {
+  try {
+    // 1. 获取当前配置
+    const { url, init } = getURLAndInit(apiConfig);
+    const configResponse = await fetch(url + '/configs', init);
+    const currentConfig = await configResponse.json();
+    
+    // 2. 添加节点到 proxies 数组
+    if (!currentConfig.proxies) {
+      currentConfig.proxies = [];
+    }
+    currentConfig.proxies.push(proxyConfig);
+    
+    // 3. 添加节点到指定的策略组
+    const proxyGroups = currentConfig['proxy-groups'] || [];
+    for (const groupName of groupNames) {
+      const targetGroup = proxyGroups.find(group => group.name === groupName);
+      if (targetGroup && targetGroup.proxies) {
+        if (!targetGroup.proxies.includes(proxyConfig.name)) {
+          targetGroup.proxies.push(proxyConfig.name);
+        }
+      }
+    }
+    
+    // 4. 更新配置
+    const updateResponse = await fetch(url + '/configs', {
+      ...init,
+      method: 'PUT',
+      body: JSON.stringify(currentConfig),
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error('配置更新失败');
+    }
+    
+    // 5. 尝试重载配置
+    try {
+      await fetch(url + '/configs?force=true', {
+        ...init,
+        method: 'PUT',
+        body: JSON.stringify({ path: '', payload: '' }),
+      });
+    } catch (reloadError) {
+      console.warn('配置重载失败，但节点已添加:', reloadError);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('添加节点到配置文件失败:', error);
+    throw error;
+  }
+}
+
+// 新的：导出配置为 YAML
+export async function exportConfigAsYaml(apiConfig) {
+  try {
+    const { url, init } = getURLAndInit(apiConfig);
+    const configResponse = await fetch(url + '/configs', init);
+    const currentConfig = await configResponse.json();
+    
+    // 简单的 JSON 到 YAML 转换
+    const yamlContent = JSON.stringify(currentConfig, null, 2);
+    
+    // 创建下载链接
+    const blob = new Blob([yamlContent], { type: 'text/yaml' });
+    const url2 = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url2;
+    a.download = 'clash_config.yaml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url2);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('导出配置失败:', error);
+    throw error;
+  }
+}
+
 // 添加节点到策略组
 export async function addProxyToProxyGroup(apiConfig, groupName, proxyName) {
   try {
