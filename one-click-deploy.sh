@@ -610,7 +610,10 @@ download_enhanced_yacd() {
     if [ -d "$temp_dir/$simple_dir/dist" ]; then
         log "找到 dist 目录，使用 dist 目录内容"
         log "准备返回路径: $temp_dir/$simple_dir/dist"
-        echo "$temp_dir/$simple_dir/dist"
+        local result="$temp_dir/$simple_dir/dist"
+        log "设置结果变量: $result"
+        echo "$result"
+        log "echo 命令已执行"
         log "路径已返回"
     else
         log "dist 目录不存在"
@@ -626,6 +629,8 @@ download_enhanced_yacd() {
     fi
     
     log "download_enhanced_yacd 函数即将结束"
+    log "当前工作目录: $(pwd)"
+    log "当前用户: $(whoami)"
 }
 
 # 部署 Yacd 文件
@@ -889,9 +894,13 @@ main() {
     backup_original_yacd
     
     # 下载并部署
+    log "开始调用 download_enhanced_yacd 函数..."
     local source_dir=$(download_enhanced_yacd)
+    log "download_enhanced_yacd 函数调用完成"
     log "获取到源目录: $source_dir"
+    log "开始调用 deploy_yacd_files 函数..."
     deploy_yacd_files "$source_dir"
+    log "deploy_yacd_files 函数调用完成"
     
     # 部署自动同步
     deploy_auto_sync
