@@ -570,6 +570,11 @@ download_enhanced_yacd() {
     mv "$extracted_dir" "$simple_dir"
     
     success "文件解压完成: $simple_dir"
+    log "解压目录路径: $temp_dir/$simple_dir"
+    
+    # 检查解压后的目录内容
+    log "解压目录内容:"
+    ls -la "$temp_dir/$simple_dir" 2>/dev/null || log "无法列出解压目录内容"
     
     # 返回重命名后的目录路径
     echo "$temp_dir/$simple_dir"
@@ -580,6 +585,18 @@ deploy_yacd_files() {
     local source_dir="$1"
     
     log "部署 Yacd 文件..."
+    log "源目录: $source_dir"
+    log "目标目录: $YACD_PATH"
+    
+    # 检查源目录是否存在
+    if [ ! -d "$source_dir" ]; then
+        error "源目录不存在: $source_dir"
+        return 1
+    fi
+    
+    # 显示源目录内容
+    log "源目录内容:"
+    ls -la "$source_dir" 2>/dev/null || log "无法列出源目录内容"
     
     # 清空目标目录
     if [ -d "$YACD_PATH" ]; then
@@ -591,22 +608,44 @@ deploy_yacd_files() {
     # 复制文件（使用更简单的方式）
     if [ -d "$source_dir/public" ]; then
         log "复制 public 目录内容..."
-        cp -r "$source_dir/public"/* "$YACD_PATH/" 2>/dev/null || {
+        # 先尝试直接复制
+        if cp -r "$source_dir/public"/* "$YACD_PATH/" 2>/dev/null; then
+            success "直接复制成功"
+        else
             # 如果复制失败，逐个复制文件
-            log "批量复制失败，尝试逐个复制..."
-            find "$source_dir/public" -type f -exec cp {} "$YACD_PATH/" \;
-        }
+            log "直接复制失败，尝试逐个复制..."
+            if find "$source_dir/public" -type f -exec cp {} "$YACD_PATH/" \; 2>/dev/null; then
+                success "逐个复制成功"
+            else
+                error "逐个复制也失败了"
+                return 1
+            fi
+        fi
     else
         log "复制整个目录内容..."
-        # 使用 find 和 cp 的组合来避免文件名过长问题
-        find "$source_dir" -type f -exec cp {} "$YACD_PATH/" \; 2>/dev/null || {
-            log "复制失败，尝试使用 rsync..."
-            rsync -av "$source_dir/" "$YACD_PATH/" 2>/dev/null || {
-                error "所有复制方式都失败了"
-                return 1
-            }
-        }
+        # 先尝试直接复制
+        if cp -r "$source_dir"/* "$YACD_PATH/" 2>/dev/null; then
+            success "直接复制成功"
+        else
+            # 使用 find 和 cp 的组合来避免文件名过长问题
+            log "直接复制失败，尝试逐个复制..."
+            if find "$source_dir" -type f -exec cp {} "$YACD_PATH/" \; 2>/dev/null; then
+                success "逐个复制成功"
+            else
+                log "逐个复制失败，尝试使用 rsync..."
+                if rsync -av "$source_dir/" "$YACD_PATH/" 2>/dev/null; then
+                    success "rsync 复制成功"
+                else
+                    error "所有复制方式都失败了"
+                    return 1
+                fi
+            fi
+        fi
     fi
+    
+    # 检查复制结果
+    log "复制后的目标目录内容:"
+    ls -la "$YACD_PATH" 2>/dev/null || log "无法列出目标目录内容"
     
     # 设置权限
     chown -R root:root "$YACD_PATH"
