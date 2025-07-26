@@ -95,7 +95,10 @@ install_nodejs() {
     
     # 如果包管理器安装失败，使用预编译二进制文件
     log "包管理器安装失败，使用预编译二进制文件..."
-    install_nodejs_binary
+    if ! install_nodejs_binary; then
+        log "主要安装方案失败，尝试备用方案..."
+        install_nodejs_alternative
+    fi
 }
 
 # 安装 Node.js 二进制文件
@@ -105,6 +108,9 @@ install_nodejs_binary() {
     # 创建目录
     mkdir -p /usr/local/nodejs
     cd /usr/local/nodejs
+    
+    # 清理之前的文件
+    rm -rf node.tar.xz node-v18.19.0-*
     
     # 检测架构
     local arch=$(uname -m)
@@ -157,20 +163,45 @@ install_nodejs_binary() {
         fi
     fi
     
+    # 检查下载的文件
+    if [ ! -f "node.tar.xz" ] || [ ! -s "node.tar.xz" ]; then
+        error "下载的文件无效或为空"
+        return 1
+    fi
+    
     # 解压
     log "解压 Node.js..."
-    tar -xf node.tar.xz
+    if ! tar -xf node.tar.xz; then
+        error "解压失败，尝试使用不同的解压选项..."
+        # 尝试不同的解压选项
+        if ! tar -xf node.tar.xz --strip-components=0; then
+            error "解压仍然失败，检查磁盘空间..."
+            df -h
+            return 1
+        fi
+    fi
     
     # 查找解压后的目录
     local extracted_dir=$(find . -name "node-$node_version-*" -type d | head -1)
     if [ -z "$extracted_dir" ]; then
         error "解压后未找到正确的目录"
+        ls -la
         return 1
     fi
     
+    log "找到解压目录: $extracted_dir"
+    
     # 移动到正确位置
     log "安装 Node.js..."
-    mv "$extracted_dir"/* /usr/local/nodejs/
+    if [ -d "$extracted_dir" ]; then
+        cp -r "$extracted_dir"/* /usr/local/nodejs/ 2>/dev/null || {
+            error "复制文件失败"
+            return 1
+        }
+    else
+        error "解压目录不存在"
+        return 1
+    fi
     
     # 创建软链接
     ln -sf /usr/local/nodejs/bin/node /usr/bin/node
@@ -209,6 +240,58 @@ install_js_yaml() {
         warn "js-yaml 安装失败，但可以继续部署"
         return 1
     fi
+}
+
+# 备用 Node.js 安装方案
+install_nodejs_alternative() {
+    log "尝试备用 Node.js 安装方案..."
+    
+    # 创建简单的 Node.js 环境
+    mkdir -p /usr/local/nodejs/bin
+    cd /usr/local/nodejs
+    
+    # 下载预编译的 Node.js 二进制文件
+    local arch=$(uname -m)
+    local node_url=""
+    
+    case $arch in
+        x86_64)
+            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-x64.tar.gz"
+            ;;
+        aarch64|arm64)
+            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-arm64.tar.gz"
+            ;;
+        *)
+            node_url="https://nodejs.org/dist/v18.19.0/node-v18.19.0-linux-x64.tar.gz"
+            ;;
+    esac
+    
+    log "下载备用 Node.js: $node_url"
+    
+    if wget -O node.tar.gz "$node_url"; then
+        log "备用下载成功"
+        
+        # 使用 gunzip 解压
+        if gunzip -c node.tar.gz | tar -xf -; then
+            log "备用解压成功"
+            
+            # 查找并复制文件
+            local node_dir=$(find . -name "node-v18.19.0-*" -type d | head -1)
+            if [ -n "$node_dir" ] && [ -d "$node_dir" ]; then
+                cp -r "$node_dir"/* /usr/local/nodejs/
+                ln -sf /usr/local/nodejs/bin/node /usr/bin/node
+                ln -sf /usr/local/nodejs/bin/npm /usr/bin/npm
+                
+                if node --version &> /dev/null; then
+                    log "备用 Node.js 安装成功: $(node --version)"
+                    return 0
+                fi
+            fi
+        fi
+    fi
+    
+    error "备用安装方案也失败了"
+    return 1
 }
 
 # 备份原版 Yacd
