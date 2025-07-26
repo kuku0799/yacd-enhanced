@@ -96,23 +96,69 @@ export async function addProxyToAllGroups(apiConfig, proxyName, groupNames) {
   return await Promise.all(promises);
 }
 
-export async function removeProxyFromGroup(apiConfig, groupName, proxyName) {
+// 添加节点到配置文件的API
+export async function addProxyToConfig(apiConfig, proxyConfig) {
   const { url, init } = getURLAndInit(apiConfig);
-  const body = { name: proxyName };
-  const fullURL = `${url}${endpoint}/${encodeURIComponent(groupName)}`;
+  const fullURL = `${url}/configs`;
+  
+  // 获取当前配置
+  const configResponse = await fetch(fullURL, init);
+  const currentConfig = await configResponse.json();
+  
+  // 添加新代理到配置中
+  if (!currentConfig.proxies) {
+    currentConfig.proxies = [];
+  }
+  
+  // 检查是否已存在相同名称的代理
+  const existingIndex = currentConfig.proxies.findIndex(p => p.name === proxyConfig.name);
+  if (existingIndex !== -1) {
+    // 更新现有代理
+    currentConfig.proxies[existingIndex] = proxyConfig;
+  } else {
+    // 添加新代理
+    currentConfig.proxies.push(proxyConfig);
+  }
+  
+  // 更新配置
   return await fetch(fullURL, {
     ...init,
-    method: 'DELETE',
-    body: JSON.stringify(body),
+    method: 'PUT',
+    body: JSON.stringify(currentConfig),
   });
 }
 
-export async function removeProxyFromAllGroups(apiConfig, proxyName, groupNames) {
-  const promises = groupNames.map(groupName => 
-    removeProxyFromGroup(apiConfig, groupName, proxyName)
-  );
-  return await Promise.all(promises);
+// 添加节点到策略组
+export async function addProxyToProxyGroup(apiConfig, groupName, proxyName) {
+  const { url, init } = getURLAndInit(apiConfig);
+  const fullURL = `${url}/configs`;
+  
+  // 获取当前配置
+  const configResponse = await fetch(fullURL, init);
+  const currentConfig = await configResponse.json();
+  
+  // 查找策略组
+  if (currentConfig['proxy-groups']) {
+    const group = currentConfig['proxy-groups'].find(g => g.name === groupName);
+    if (group && group.proxies) {
+      // 检查代理是否已在组中
+      if (!group.proxies.includes(proxyName)) {
+        group.proxies.push(proxyName);
+        
+        // 更新配置
+        return await fetch(fullURL, {
+          ...init,
+          method: 'PUT',
+          body: JSON.stringify(currentConfig),
+        });
+      }
+    }
+  }
+  
+  throw new Error(`无法找到策略组: ${groupName}`);
 }
+
+
 
 export async function parseSubscriptionUrl(url) {
   try {

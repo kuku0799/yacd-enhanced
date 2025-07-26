@@ -1,13 +1,12 @@
 import * as React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Link, FileText, Trash2 } from 'react-feather';
+import { Plus, Link, FileText } from 'react-feather';
 
 import * as proxiesAPI from '~/api/proxies';
 import { connect, useStoreActions } from '~/components/StateProvider';
 import { getClashAPIConfig } from '~/store/app';
 import { getProxyGroupNames, fetchProxies } from '~/store/proxies';
 import type { State } from '~/store/types';
-import ProxyRemover from './ProxyRemover';
 
 import s from './ProxyManager.module.scss';
 
@@ -31,7 +30,7 @@ type ProxyConfig = {
   username?: string;
 };
 
-type TabType = 'manual' | 'url' | 'text' | 'remove';
+type TabType = 'manual' | 'url' | 'text';
 
 function ProxyManager({ dispatch, groupNames, apiConfig }) {
   const { t } = useTranslation();
@@ -112,11 +111,32 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
 
     setLoading(true);
     try {
-      // 这里需要根据实际的Clash API来实现节点添加
-      // 由于Clash API的限制，这里只是示例
+      // 构建代理配置对象
+      const proxyConfigObj = {
+        name: proxyConfig.name,
+        type: proxyConfig.type,
+        server: proxyConfig.server,
+        port: parseInt(proxyConfig.port),
+        ...(proxyConfig.password && { password: proxyConfig.password }),
+        ...(proxyConfig.method && { method: proxyConfig.method }),
+        ...(proxyConfig.uuid && { uuid: proxyConfig.uuid }),
+        ...(proxyConfig.security && { security: proxyConfig.security }),
+        ...(proxyConfig.network && { network: proxyConfig.network }),
+        ...(proxyConfig.sni && { sni: proxyConfig.sni }),
+        ...(proxyConfig.path && { path: proxyConfig.path }),
+        ...(proxyConfig.host && { host: proxyConfig.host }),
+        ...(proxyConfig.protocol && { protocol: proxyConfig.protocol }),
+        ...(proxyConfig.obfs && { obfs: proxyConfig.obfs }),
+        ...(proxyConfig.username && { username: proxyConfig.username }),
+      };
+
+      // 首先添加代理到配置文件
+      await proxiesAPI.addProxyToConfig(apiConfig, proxyConfigObj);
+      
+      // 然后添加到策略组
       await Promise.all(
         groupsToAdd.map(groupName =>
-          proxiesAPI.addProxyToGroup(apiConfig, groupName, proxyConfig.name)
+          proxiesAPI.addProxyToProxyGroup(apiConfig, groupName, proxyConfig.name)
         )
       );
       
@@ -142,6 +162,7 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
         username: '',
       });
     } catch (error) {
+      console.error('添加节点失败:', error);
       showMessage('error', t('add_proxy_failed'));
     } finally {
       setLoading(false);
@@ -467,14 +488,6 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
             >
               {t('import_from_url')}
             </button>
-            <button
-              className={`${s.tab} ${activeTab === 'remove' ? s.active : ''}`}
-              onClick={() => setActiveTab('remove')}
-              style={{ color: '#f44336' }}
-            >
-              <Trash2 size={16} />
-              删除节点
-            </button>
           </div>
 
           {message && (
@@ -486,7 +499,6 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
           {activeTab === 'manual' && renderManualForm()}
           {activeTab === 'url' && renderUrlForm()}
           {activeTab === 'text' && renderTextForm()}
-          {activeTab === 'remove' && <ProxyRemover dispatch={dispatch} groupNames={groupNames} apiConfig={apiConfig} />}
         </div>
       );
 }
