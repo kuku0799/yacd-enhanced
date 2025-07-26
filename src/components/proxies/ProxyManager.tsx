@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Plus, Link, FileText } from 'react-feather';
 
 import * as proxiesAPI from '~/api/proxies';
+import * as configsAPI from '~/api/configs';
 import { connect, useStoreActions } from '~/components/StateProvider';
 import { getClashAPIConfig } from '~/store/app';
 import { getProxyGroupNames, fetchProxies } from '~/store/proxies';
@@ -226,6 +227,27 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
       setLoading(false);
     }
   }, [proxyText, t]);
+
+  const handleExportConfig = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 获取当前配置
+      const config = await configsAPI.getCurrentConfig(apiConfig);
+      
+      // 导出为 YAML
+      const yamlContent = configsAPI.exportConfigAsYaml(config);
+      
+      // 下载文件
+      configsAPI.downloadConfigFile(yamlContent, 'clash_config_export.yaml');
+      
+      showMessage('success', '配置文件导出成功');
+    } catch (error) {
+      console.error('导出配置失败:', error);
+      showMessage('error', '导出配置失败');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiConfig, t]);
 
   const renderManualForm = () => (
     <div className={s.form}>
@@ -513,6 +535,17 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
           {activeTab === 'manual' && renderManualForm()}
           {activeTab === 'url' && renderUrlForm()}
           {activeTab === 'text' && renderTextForm()}
+          
+          {/* 配置导出按钮 */}
+          <div style={{ marginTop: '20px', textAlign: 'center' }}>
+            <button
+              className={`${s.button} ${s.secondary}`}
+              onClick={handleExportConfig}
+              disabled={loading}
+            >
+              📥 导出配置文件
+            </button>
+          </div>
         </div>
       );
 }

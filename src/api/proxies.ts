@@ -101,31 +101,75 @@ export async function addProxyToConfig(apiConfig, proxyConfig) {
   const { url, init } = getURLAndInit(apiConfig);
   const fullURL = `${url}/configs`;
   
-  // 获取当前配置
-  const configResponse = await fetch(fullURL, init);
-  const currentConfig = await configResponse.json();
-  
-  // 添加新代理到配置中
-  if (!currentConfig.proxies) {
-    currentConfig.proxies = [];
+  try {
+    // 获取当前配置
+    const configResponse = await fetch(fullURL, init);
+    const currentConfig = await configResponse.json();
+    
+    // 添加新代理到配置中
+    if (!currentConfig.proxies) {
+      currentConfig.proxies = [];
+    }
+    
+    // 检查是否已存在相同名称的代理
+    const existingIndex = currentConfig.proxies.findIndex(p => p.name === proxyConfig.name);
+    if (existingIndex !== -1) {
+      // 更新现有代理
+      currentConfig.proxies[existingIndex] = proxyConfig;
+    } else {
+      // 添加新代理
+      currentConfig.proxies.push(proxyConfig);
+    }
+    
+    // 更新配置
+    const updateResponse = await fetch(fullURL, {
+      ...init,
+      method: 'PUT',
+      body: JSON.stringify(currentConfig),
+    });
+    
+    if (!updateResponse.ok) {
+      throw new Error(`更新配置失败: ${updateResponse.status}`);
+    }
+    
+    return updateResponse;
+  } catch (error) {
+    console.error('添加节点到配置文件失败:', error);
+    throw error;
   }
+}
+
+// 直接写入配置文件（通过 Clash 的配置重载功能）
+export async function writeConfigToFile(apiConfig, configData) {
+  const { url, init } = getURLAndInit(apiConfig);
   
-  // 检查是否已存在相同名称的代理
-  const existingIndex = currentConfig.proxies.findIndex(p => p.name === proxyConfig.name);
-  if (existingIndex !== -1) {
-    // 更新现有代理
-    currentConfig.proxies[existingIndex] = proxyConfig;
-  } else {
-    // 添加新代理
-    currentConfig.proxies.push(proxyConfig);
+  try {
+    // 先更新内存配置
+    const configResponse = await fetch(`${url}/configs`, {
+      ...init,
+      method: 'PUT',
+      body: JSON.stringify(configData),
+    });
+    
+    if (!configResponse.ok) {
+      throw new Error(`更新内存配置失败: ${configResponse.status}`);
+    }
+    
+    // 强制重载配置（这会触发配置文件写入）
+    const reloadResponse = await fetch(`${url}/configs/reload`, {
+      ...init,
+      method: 'PUT',
+    });
+    
+    if (!reloadResponse.ok) {
+      throw new Error(`重载配置失败: ${reloadResponse.status}`);
+    }
+    
+    return reloadResponse;
+  } catch (error) {
+    console.error('写入配置文件失败:', error);
+    throw error;
   }
-  
-  // 更新配置
-  return await fetch(fullURL, {
-    ...init,
-    method: 'PUT',
-    body: JSON.stringify(currentConfig),
-  });
 }
 
 // 添加节点到策略组

@@ -105,6 +105,8 @@ export const data = {
   'add_proxy_failed': '节点添加失败',
   'parse_proxy_success': '解析成功',
   'parse_proxy_failed': '解析失败',
+  'export_config_success': '配置文件导出成功',
+  'export_config_failed': '导出配置失败',
   'select_groups': '选择策略组',
   'all_groups': '所有策略组',
   'vmess': 'VMess',
