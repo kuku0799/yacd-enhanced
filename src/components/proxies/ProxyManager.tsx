@@ -456,16 +456,16 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
               {t('add_proxy')}
             </button>
             <button
-              className={`${s.tab} ${activeTab === 'url' ? s.active : ''}`}
-              onClick={() => setActiveTab('url')}
-            >
-              {t('import_from_url')}
-            </button>
-            <button
               className={`${s.tab} ${activeTab === 'text' ? s.active : ''}`}
               onClick={() => setActiveTab('text')}
             >
               {t('import_from_text')}
+            </button>
+            <button
+              className={`${s.tab} ${activeTab === 'url' ? s.active : ''}`}
+              onClick={() => setActiveTab('url')}
+            >
+              {t('import_from_url')}
             </button>
             <button
               className={`${s.tab} ${activeTab === 'remove' ? s.active : ''}`}
