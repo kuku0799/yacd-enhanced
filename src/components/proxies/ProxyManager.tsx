@@ -4,6 +4,7 @@ import { Plus, Link, FileText } from 'react-feather';
 
 import * as proxiesAPI from '~/api/proxies';
 import * as configsAPI from '~/api/configs';
+import { autoSyncNodes } from '~/api/autoSync';
 import { connect, useStoreActions } from '~/components/StateProvider';
 import { getClashAPIConfig } from '~/store/app';
 import { getProxyGroupNames, fetchProxies } from '~/store/proxies';
@@ -155,8 +156,17 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
       
       console.log('添加结果:', addResults);
       
+      // 🚀 新增：自动同步到配置文件
+      try {
+        const syncResult = await autoSyncNodes(apiConfig, [proxyConfigObj]);
+        console.log('自动同步结果:', syncResult);
+        showMessage('success', t('add_proxy_success') + ' (自动同步已启用)');
+      } catch (syncError) {
+        console.error('自动同步失败:', syncError);
+        showMessage('success', t('add_proxy_success') + ' (自动同步失败)');
+      }
+      
       await dispatch(fetchProxies(apiConfig));
-      showMessage('success', t('add_proxy_success'));
       
       // 重置表单
       setProxyConfig({

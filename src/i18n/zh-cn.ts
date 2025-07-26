@@ -107,6 +107,8 @@ export const data = {
   'parse_proxy_failed': '解析失败',
   'export_config_success': '配置文件导出成功',
   'export_config_failed': '导出配置失败',
+  'auto_sync_enabled': '自动同步已启用',
+  'auto_sync_failed': '自动同步失败',
   'select_groups': '选择策略组',
   'all_groups': '所有策略组',
   'vmess': 'VMess',
