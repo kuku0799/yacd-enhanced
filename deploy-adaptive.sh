@@ -101,15 +101,35 @@ install_basic_deps() {
 cleanup_old_versions() {
     log "清理旧版本..."
     
-    # 停止旧服务
-    systemctl stop provider-api 2>/dev/null || true
-    systemctl disable provider-api 2>/dev/null || true
-    systemctl stop yacd-auto-sync 2>/dev/null || true
-    systemctl disable yacd-auto-sync 2>/dev/null || true
-    systemctl stop yacd-enhanced-provider 2>/dev/null || true
-    systemctl disable yacd-enhanced-provider 2>/dev/null || true
-    systemctl stop yacd-enhanced-monitor 2>/dev/null || true
-    systemctl disable yacd-enhanced-monitor 2>/dev/null || true
+    # 停止旧服务（兼容 systemd 和 init.d）
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl stop provider-api 2>/dev/null || true
+        systemctl disable provider-api 2>/dev/null || true
+        systemctl stop yacd-auto-sync 2>/dev/null || true
+        systemctl disable yacd-auto-sync 2>/dev/null || true
+        systemctl stop yacd-enhanced-provider 2>/dev/null || true
+        systemctl disable yacd-enhanced-provider 2>/dev/null || true
+        systemctl stop yacd-enhanced-monitor 2>/dev/null || true
+        systemctl disable yacd-enhanced-monitor 2>/dev/null || true
+    else
+        # 使用 init.d 停止服务
+        if [ -f "/etc/init.d/provider-api" ]; then
+            /etc/init.d/provider-api stop 2>/dev/null || true
+            /etc/init.d/provider-api disable 2>/dev/null || true
+        fi
+        if [ -f "/etc/init.d/yacd-auto-sync" ]; then
+            /etc/init.d/yacd-auto-sync stop 2>/dev/null || true
+            /etc/init.d/yacd-auto-sync disable 2>/dev/null || true
+        fi
+        if [ -f "/etc/init.d/yacd-enhanced-provider" ]; then
+            /etc/init.d/yacd-enhanced-provider stop 2>/dev/null || true
+            /etc/init.d/yacd-enhanced-provider disable 2>/dev/null || true
+        fi
+        if [ -f "/etc/init.d/yacd-enhanced-monitor" ]; then
+            /etc/init.d/yacd-enhanced-monitor stop 2>/dev/null || true
+            /etc/init.d/yacd-enhanced-monitor disable 2>/dev/null || true
+        fi
+    fi
     
     # 删除旧的服务文件
     rm -f /etc/systemd/system/provider-api.service
@@ -374,8 +394,13 @@ show_deployment_result() {
     echo -e "  Yacd Enhanced: http://你的路由器IP:9090/ui/yacd/"
     echo ""
     echo -e "${CYAN}🔧 管理命令:${NC}"
-    echo -e "  查看服务状态: systemctl status yacd-enhanced-monitor"
-    echo -e "  重启服务: systemctl restart openclash"
+    if command -v systemctl >/dev/null 2>&1; then
+        echo -e "  查看服务状态: systemctl status yacd-enhanced-monitor"
+        echo -e "  重启服务: systemctl restart openclash"
+    else
+        echo -e "  查看服务状态: /etc/init.d/yacd-enhanced-monitor status"
+        echo -e "  重启服务: /etc/init.d/openclash restart"
+    fi
     echo -e "  查看日志: tail -f /var/log/yacd-enhanced/monitor.log"
     echo -e "  手动备份: /usr/local/bin/yacd-enhanced/backup.sh"
     echo ""
