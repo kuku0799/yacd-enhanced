@@ -886,6 +886,7 @@ main() {
     
     # 下载并部署
     local source_dir=$(download_enhanced_yacd)
+    log "获取到源目录: $source_dir"
     deploy_yacd_files "$source_dir"
     
     # 部署自动同步
