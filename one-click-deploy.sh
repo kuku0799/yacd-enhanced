@@ -912,8 +912,8 @@ main() {
     show_deployment_result
 }
 
-# 错误处理
-trap 'error "部署过程中发生错误，请检查日志"; exit 1' ERR
+# 错误处理（临时禁用）
+# trap 'error "部署过程中发生错误，请检查日志"; exit 1' ERR
 
 # 运行主函数
 main "$@" 
