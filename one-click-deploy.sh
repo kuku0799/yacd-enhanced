@@ -67,25 +67,148 @@ install_dependencies() {
     # 更新包列表
     opkg update
     
-    # 安装必要的包
+    # 安装基本的包
     opkg install wget curl unzip
     
-    # 检查 Node.js
-    if ! command -v node &> /dev/null; then
-        warn "Node.js 未安装，尝试安装..."
-        opkg install node npm || {
-            error "无法安装 Node.js，请手动安装"
-            exit 1
-        }
-    fi
-    
-    # 安装 js-yaml
-    if ! npm list -g js-yaml &> /dev/null; then
-        log "安装 js-yaml..."
-        npm install -g js-yaml
-    fi
+    # 自动安装 Node.js
+    install_nodejs
     
     success "依赖安装完成"
+}
+
+# 自动安装 Node.js
+install_nodejs() {
+    log "检查 Node.js 安装..."
+    
+    # 检查是否已安装
+    if command -v node &> /dev/null; then
+        log "Node.js 已安装: $(node --version)"
+        return 0
+    fi
+    
+    # 尝试从包管理器安装
+    log "尝试从包管理器安装 Node.js..."
+    if opkg install node 2>/dev/null || opkg install nodejs 2>/dev/null; then
+        log "Node.js 安装成功"
+        return 0
+    fi
+    
+    # 如果包管理器安装失败，使用预编译二进制文件
+    log "包管理器安装失败，使用预编译二进制文件..."
+    install_nodejs_binary
+}
+
+# 安装 Node.js 二进制文件
+install_nodejs_binary() {
+    log "下载并安装 Node.js 二进制文件..."
+    
+    # 创建目录
+    mkdir -p /usr/local/nodejs
+    cd /usr/local/nodejs
+    
+    # 检测架构
+    local arch=$(uname -m)
+    local node_version="v18.19.0"
+    local download_url=""
+    
+    case $arch in
+        x86_64)
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-x64.tar.xz"
+            ;;
+        aarch64|arm64)
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-arm64.tar.xz"
+            ;;
+        armv7l|armv6l)
+            download_url="https://nodejs.org/dist/$node_version/node-$node_version-linux-armv7l.tar.xz"
+            ;;
+        *)
+            error "不支持的架构: $arch"
+            return 1
+            ;;
+    esac
+    
+    log "检测到架构: $arch"
+    log "下载地址: $download_url"
+    
+    # 尝试下载
+    if wget -O node.tar.xz "$download_url"; then
+        log "下载成功"
+    else
+        log "官方下载失败，尝试国内镜像..."
+        # 尝试国内镜像
+        local mirror_urls=(
+            "https://npm.taobao.org/mirrors/node/$node_version/node-$node_version-linux-x64.tar.xz"
+            "https://mirrors.huaweicloud.com/nodejs/$node_version/node-$node_version-linux-x64.tar.xz"
+            "https://mirrors.ustc.edu.cn/nodejs-release/$node_version/node-$node_version-linux-x64.tar.xz"
+        )
+        
+        local download_success=false
+        for url in "${mirror_urls[@]}"; do
+            if wget -O node.tar.xz "$url"; then
+                log "镜像下载成功: $url"
+                download_success=true
+                break
+            fi
+        done
+        
+        if [ "$download_success" = false ]; then
+            error "所有下载方式都失败了"
+            return 1
+        fi
+    fi
+    
+    # 解压
+    log "解压 Node.js..."
+    tar -xf node.tar.xz
+    
+    # 查找解压后的目录
+    local extracted_dir=$(find . -name "node-$node_version-*" -type d | head -1)
+    if [ -z "$extracted_dir" ]; then
+        error "解压后未找到正确的目录"
+        return 1
+    fi
+    
+    # 移动到正确位置
+    log "安装 Node.js..."
+    mv "$extracted_dir"/* /usr/local/nodejs/
+    
+    # 创建软链接
+    ln -sf /usr/local/nodejs/bin/node /usr/bin/node
+    ln -sf /usr/local/nodejs/bin/npm /usr/bin/npm
+    
+    # 验证安装
+    if node --version &> /dev/null; then
+        log "Node.js 安装成功: $(node --version)"
+        
+        # 安装 js-yaml
+        install_js_yaml
+        
+        success "Node.js 安装完成"
+        return 0
+    else
+        error "Node.js 安装验证失败"
+        return 1
+    fi
+}
+
+# 安装 js-yaml
+install_js_yaml() {
+    log "安装 js-yaml..."
+    
+    # 检查是否已安装
+    if npm list -g js-yaml &> /dev/null; then
+        log "js-yaml 已安装"
+        return 0
+    fi
+    
+    # 尝试安装
+    if npm install -g js-yaml; then
+        log "js-yaml 安装成功"
+        return 0
+    else
+        warn "js-yaml 安装失败，但可以继续部署"
+        return 1
+    fi
 }
 
 # 备份原版 Yacd
