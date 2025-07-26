@@ -80,6 +80,34 @@ install_dependencies() {
 install_nodejs() {
     log "检查 Node.js 安装..."
     
+    # 检查多个可能的 Node.js 路径
+    local node_paths=("/usr/bin/node" "/usr/local/bin/node" "/opt/bin/node")
+    local node_found=""
+    
+    for path in "${node_paths[@]}"; do
+        if [ -x "$path" ]; then
+            node_found="$path"
+            break
+        fi
+    done
+    
+    if [ -n "$node_found" ]; then
+        # 尝试运行 node --version
+        local version=$("$node_found" --version 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            log "Node.js 已安装: $version"
+            return 0
+        else
+            log "Node.js 存在但无法运行，尝试修复权限..."
+            chmod +x "$node_found" 2>/dev/null
+            version=$("$node_found" --version 2>/dev/null)
+            if [ $? -eq 0 ]; then
+                log "Node.js 权限修复成功: $version"
+                return 0
+            fi
+        fi
+    fi
+    
     # 检查是否已安装
     if command -v node &> /dev/null; then
         log "Node.js 已安装: $(node --version)"
@@ -623,21 +651,42 @@ deploy_yacd_files() {
         fi
     else
         log "复制整个目录内容..."
+        
+        # 检查源目录是否为空
+        if [ -z "$(ls -A "$source_dir" 2>/dev/null)" ]; then
+            error "源目录为空: $source_dir"
+            return 1
+        fi
+        
         # 先尝试直接复制
+        log "尝试直接复制..."
         if cp -r "$source_dir"/* "$YACD_PATH/" 2>/dev/null; then
             success "直接复制成功"
         else
             # 使用 find 和 cp 的组合来避免文件名过长问题
             log "直接复制失败，尝试逐个复制..."
-            if find "$source_dir" -type f -exec cp {} "$YACD_PATH/" \; 2>/dev/null; then
-                success "逐个复制成功"
+            local copy_count=0
+            while IFS= read -r -d '' file; do
+                if cp "$file" "$YACD_PATH/" 2>/dev/null; then
+                    ((copy_count++))
+                fi
+            done < <(find "$source_dir" -type f -print0 2>/dev/null)
+            
+            if [ $copy_count -gt 0 ]; then
+                success "逐个复制成功，复制了 $copy_count 个文件"
             else
                 log "逐个复制失败，尝试使用 rsync..."
                 if rsync -av "$source_dir/" "$YACD_PATH/" 2>/dev/null; then
                     success "rsync 复制成功"
                 else
-                    error "所有复制方式都失败了"
-                    return 1
+                    log "rsync 也失败了，尝试最后的方法..."
+                    # 最后尝试：使用 tar 打包再解压
+                    if (cd "$source_dir" && tar -czf - .) | (cd "$YACD_PATH" && tar -xzf -) 2>/dev/null; then
+                        success "tar 复制成功"
+                    else
+                        error "所有复制方式都失败了"
+                        return 1
+                    fi
                 fi
             fi
         fi
