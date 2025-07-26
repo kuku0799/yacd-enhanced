@@ -329,7 +329,9 @@ function retrieveGroupNamesFrom(proxies: Record<string, ProxyItem>) {
   const proxyNames = [];
   for (const prop in proxies) {
     const p = proxies[prop];
-    if (p.all && Array.isArray(p.all)) {
+    // 检查是否为策略组：有 all 属性或 type 为策略组类型
+    if ((p.all && Array.isArray(p.all)) || 
+        (p.type && ['Selector', 'URLTest', 'Fallback', 'LoadBalance'].includes(p.type))) {
       groupNames.push(prop);
       if (prop === 'GLOBAL') {
         globalAll = Array.from(p.all);

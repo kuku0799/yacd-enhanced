@@ -103,14 +103,18 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
       return;
     }
 
-    const groupsToAdd = addToAllGroups ? groupNames : selectedGroups;
-    if (groupsToAdd.length === 0) {
-      showMessage('error', t('请选择至少一个策略组'));
-      return;
-    }
-
     setLoading(true);
     try {
+      // 获取实际的策略组列表
+      const actualGroups = await proxiesAPI.getProxyGroups(apiConfig);
+      console.log('获取到的策略组:', actualGroups);
+      
+      const groupsToAdd = addToAllGroups ? actualGroups : selectedGroups;
+      if (groupsToAdd.length === 0) {
+        showMessage('error', t('请选择至少一个策略组'));
+        return;
+      }
+
       // 构建代理配置对象
       const proxyConfigObj = {
         name: proxyConfig.name,
@@ -130,15 +134,25 @@ function ProxyManager({ dispatch, groupNames, apiConfig }) {
         ...(proxyConfig.username && { username: proxyConfig.username }),
       };
 
+      console.log('添加节点配置:', proxyConfigObj);
+      console.log('目标策略组:', groupsToAdd);
+
       // 首先添加代理到配置文件
       await proxiesAPI.addProxyToConfig(apiConfig, proxyConfigObj);
       
       // 然后添加到策略组
-      await Promise.all(
-        groupsToAdd.map(groupName =>
-          proxiesAPI.addProxyToProxyGroup(apiConfig, groupName, proxyConfig.name)
-        )
+      const addResults = await Promise.all(
+        groupsToAdd.map(async groupName => {
+          try {
+            return await proxiesAPI.addProxyToProxyGroup(apiConfig, groupName, proxyConfig.name);
+          } catch (error) {
+            console.error(`添加到策略组 ${groupName} 失败:`, error);
+            return { error: error.message };
+          }
+        })
       );
+      
+      console.log('添加结果:', addResults);
       
       await dispatch(fetchProxies(apiConfig));
       showMessage('success', t('add_proxy_success'));

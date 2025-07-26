@@ -133,29 +133,65 @@ export async function addProxyToProxyGroup(apiConfig, groupName, proxyName) {
   const { url, init } = getURLAndInit(apiConfig);
   const fullURL = `${url}/configs`;
   
-  // 获取当前配置
-  const configResponse = await fetch(fullURL, init);
-  const currentConfig = await configResponse.json();
-  
-  // 查找策略组
-  if (currentConfig['proxy-groups']) {
-    const group = currentConfig['proxy-groups'].find(g => g.name === groupName);
-    if (group && group.proxies) {
-      // 检查代理是否已在组中
-      if (!group.proxies.includes(proxyName)) {
-        group.proxies.push(proxyName);
-        
-        // 更新配置
-        return await fetch(fullURL, {
-          ...init,
-          method: 'PUT',
-          body: JSON.stringify(currentConfig),
-        });
+  try {
+    // 获取当前配置
+    const configResponse = await fetch(fullURL, init);
+    const currentConfig = await configResponse.json();
+    
+    // 查找策略组
+    if (currentConfig['proxy-groups']) {
+      const group = currentConfig['proxy-groups'].find(g => g.name === groupName);
+      if (group && group.proxies) {
+        // 检查代理是否已在组中
+        if (!group.proxies.includes(proxyName)) {
+          group.proxies.push(proxyName);
+          
+          // 更新配置
+          const updateResponse = await fetch(fullURL, {
+            ...init,
+            method: 'PUT',
+            body: JSON.stringify(currentConfig),
+          });
+          
+          if (!updateResponse.ok) {
+            throw new Error(`更新配置失败: ${updateResponse.status}`);
+          }
+          
+          return updateResponse;
+        } else {
+          console.log(`代理 ${proxyName} 已在策略组 ${groupName} 中`);
+          return { ok: true };
+        }
+      } else {
+        throw new Error(`无法找到策略组: ${groupName}`);
       }
+    } else {
+      throw new Error('配置文件中没有找到 proxy-groups 部分');
     }
+  } catch (error) {
+    console.error('添加节点到策略组失败:', error);
+    throw error;
   }
+}
+
+// 获取所有策略组名称
+export async function getProxyGroups(apiConfig) {
+  const { url, init } = getURLAndInit(apiConfig);
+  const fullURL = `${url}/configs`;
   
-  throw new Error(`无法找到策略组: ${groupName}`);
+  try {
+    const configResponse = await fetch(fullURL, init);
+    const currentConfig = await configResponse.json();
+    
+    if (currentConfig['proxy-groups']) {
+      return currentConfig['proxy-groups'].map(group => group.name);
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('获取策略组失败:', error);
+    return [];
+  }
 }
 
 
