@@ -281,7 +281,7 @@ EOF
     chmod +x /usr/local/bin/yacd-enhanced/monitor.sh
     
     # 创建监控服务（兼容 systemd 和 init.d）
-    if [ -d "/etc/systemd/system" ]; then
+    if command -v systemctl >/dev/null 2>&1 && [ -d "/etc/systemd/system" ]; then
         cat > /etc/systemd/system/yacd-enhanced-monitor.service << EOF
 [Unit]
 Description=Yacd Enhanced Monitor Service
