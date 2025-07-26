@@ -630,7 +630,12 @@ download_enhanced_yacd() {
     
     log "download_enhanced_yacd 函数即将结束"
     log "当前工作目录: $(pwd)"
-    log "当前用户: $(whoami)"
+    # 检查当前用户（避免 whoami 命令问题）
+    if command -v whoami >/dev/null 2>&1; then
+        log "当前用户: $(whoami)"
+    else
+        log "当前用户: root"
+    fi
 }
 
 # 部署 Yacd 文件
@@ -921,8 +926,8 @@ main() {
     show_deployment_result
 }
 
-# 错误处理（临时禁用）
-# trap 'error "部署过程中发生错误，请检查日志"; exit 1' ERR
+# 错误处理（重新启用，但更精确）
+trap 'if [ $? -ne 0 ]; then error "部署过程中发生错误，请检查日志"; exit 1; fi' ERR
 
 # 运行主函数
 main "$@" 
