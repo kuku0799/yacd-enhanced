@@ -80,12 +80,12 @@ install_system_deps() {
 optimize_system() {
     log "优化系统配置..."
     
-    # 优化内存使用
-    echo "vm.swappiness=10" >> /etc/sysctl.conf
+    # 优化内存使用（OpenWrt兼容）
+    if [ -f "/etc/sysctl.conf" ]; then
+        echo "vm.swappiness=10" >> /etc/sysctl.conf
+    fi
     
-    # 优化文件描述符限制
-    echo "* soft nofile 65536" >> /etc/security/limits.conf
-    echo "* hard nofile 65536" >> /etc/security/limits.conf
+    # OpenWrt系统不需要limits.conf，跳过文件描述符限制配置
     
     # 创建优化目录
     mkdir -p /opt/yacd-enhanced/{cache,logs,config}
@@ -157,11 +157,11 @@ log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$LOG_FILE"
 }
 
-# 检查服务状态
+# 检查服务状态（OpenWrt兼容）
 check_service() {
-    if ! systemctl is-active --quiet openclash; then
+    if ! /etc/init.d/openclash status > /dev/null 2>&1; then
         log "ERROR: OpenClash 服务未运行"
-        systemctl restart openclash
+        /etc/init.d/openclash restart
     fi
 }
 
@@ -181,57 +181,54 @@ check_disk() {
     fi
 }
 
-# 检查网络连接
-check_network() {
-    if ! ping -c 1 8.8.8.8 > /dev/null 2>&1; then
-        log "WARNING: 网络连接异常"
-    fi
-}
-
-# 清理日志
-cleanup_logs() {
-    if [ -f "$LOG_FILE" ] && [ $(stat -c%s "$LOG_FILE") -gt 10485760 ]; then
-        tail -n 1000 "$LOG_FILE" > "$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
-        log "INFO: 日志文件已清理"
-    fi
-}
-
-# 主监控循环
+# 主循环
 while true; do
     check_service
     check_memory
     check_disk
-    check_network
-    cleanup_logs
     sleep 60
 done
 EOF
 
+    # 设置执行权限
     chmod +x /usr/local/bin/yacd-enhanced/monitor.sh
     
-    # 创建监控服务
-    cat > /etc/systemd/system/yacd-enhanced-monitor.service << EOF
-[Unit]
-Description=Yacd Enhanced Monitor Service
-After=network.target
+    # 创建日志目录
+    mkdir -p /var/log/yacd-enhanced
+    
+    # 创建OpenWrt init.d脚本
+    cat > /etc/init.d/yacd-enhanced-monitor << 'EOF'
+#!/bin/sh /etc/rc.common
 
-[Service]
-Type=simple
-User=root
-ExecStart=/usr/local/bin/yacd-enhanced/monitor.sh
-Restart=always
-RestartSec=10
-StandardOutput=append:/var/log/yacd-enhanced/monitor.log
-StandardError=append:/var/log/yacd-enhanced/monitor.log
+START=95
+STOP=15
 
-[Install]
-WantedBy=multi-user.target
+start() {
+    echo "启动 Yacd Enhanced 监控服务..."
+    nohup /usr/local/bin/yacd-enhanced/monitor.sh > /dev/null 2>&1 &
+    echo $! > /var/run/yacd-enhanced-monitor.pid
+}
+
+stop() {
+    echo "停止 Yacd Enhanced 监控服务..."
+    if [ -f /var/run/yacd-enhanced-monitor.pid ]; then
+        kill $(cat /var/run/yacd-enhanced-monitor.pid) 2>/dev/null
+        rm -f /var/run/yacd-enhanced-monitor.pid
+    fi
+}
+
+restart() {
+    stop
+    sleep 2
+    start
+}
 EOF
 
-    # 启用并启动监控服务
-    systemctl daemon-reload
-    systemctl enable yacd-enhanced-monitor
-    systemctl start yacd-enhanced-monitor
+    # 设置执行权限
+    chmod +x /etc/init.d/yacd-enhanced-monitor
+    
+    # 启用服务
+    /etc/init.d/yacd-enhanced-monitor enable
     
     success "监控服务设置完成"
 }
@@ -351,8 +348,8 @@ show_deployment_result() {
     echo -e "  健康检查: http://你的路由器IP/health"
     echo ""
     echo -e "${CYAN}🔧 管理命令:${NC}"
-    echo -e "  查看服务状态: systemctl status yacd-enhanced-monitor"
-    echo -e "  重启服务: systemctl restart openclash"
+    echo -e "  查看服务状态: /etc/init.d/yacd-enhanced-monitor status"
+    echo -e "  重启服务: /etc/init.d/openclash restart"
     echo -e "  查看日志: tail -f /var/log/yacd-enhanced/monitor.log"
     echo -e "  手动备份: /usr/local/bin/yacd-enhanced/backup.sh"
     echo ""
