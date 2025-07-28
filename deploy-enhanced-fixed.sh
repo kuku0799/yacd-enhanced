@@ -219,6 +219,10 @@ EOF
 setup_monitoring() {
     log "设置监控服务..."
     
+    # 创建必要的目录
+    mkdir -p /usr/local/bin/yacd-enhanced
+    mkdir -p /var/log/yacd-enhanced
+    
     # 创建监控脚本
     cat > /usr/local/bin/yacd-enhanced/monitor.sh << 'EOF'
 #!/bin/bash
@@ -268,9 +272,6 @@ EOF
     # 设置执行权限
     chmod +x /usr/local/bin/yacd-enhanced/monitor.sh
     
-    # 创建日志目录
-    mkdir -p /var/log/yacd-enhanced
-    
     # 创建OpenWrt init.d脚本
     cat > /etc/init.d/yacd-enhanced-monitor << 'EOF'
 #!/bin/sh /etc/rc.common
@@ -312,6 +313,9 @@ EOF
 setup_performance_config() {
     log "设置性能配置..."
     
+    # 确保目录存在
+    mkdir -p /usr/local/bin/yacd-enhanced
+    
     # 创建性能优化配置
     cat > /usr/local/bin/yacd-enhanced/performance.sh << 'EOF'
 #!/bin/bash
@@ -339,6 +343,10 @@ EOF
 # 设置自动备份
 setup_auto_backup() {
     log "设置自动备份..."
+    
+    # 确保目录存在
+    mkdir -p /usr/local/bin/yacd-enhanced
+    mkdir -p /opt/yacd-enhanced/backups
     
     # 创建备份脚本
     cat > /usr/local/bin/yacd-enhanced/backup.sh << 'EOF'
