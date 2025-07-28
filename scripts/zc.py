@@ -4,9 +4,9 @@ import re
 from datetime import datetime
 
 def inject_groups(config, node_names: list) -> tuple:
-    # 生成手机002 到 手机254
-    target_groups = [f"手机{i}" for i in range(2, 255)]
-
+    # 自动识别现有的策略组，而不是生成固定的手机002-254
+    proxy_groups = config.get("proxy-groups", [])
+    
     # 日志路径
     log_path = os.getenv("ZC_LOG_PATH", "/root/OpenClashManage/wangluo/log.txt")
     def write_log(msg):
@@ -28,19 +28,25 @@ def inject_groups(config, node_names: list) -> tuple:
             skipped += 1
             write_log(f"⚠️ [zc] 非法节点名已跳过：{name}")
 
-    proxy_groups = config.get("proxy-groups", [])
-    group_map = {g["name"]: g for g in proxy_groups}
+    if not proxy_groups:
+        write_log("⚠️ [zc] 未找到任何策略组，跳过注入")
+        return config, 0
 
     injected_total = 0
     injected_groups = 0
 
-    for group_name in target_groups:
-        group = group_map.get(group_name)
-        if not group:
-            write_log(f"⚠️ 策略组 [{group_name}] 不存在，跳过注入")
+    # 遍历所有现有策略组
+    for group in proxy_groups:
+        group_name = group.get("name", "")
+        if not group_name:
+            continue
+
+        # 跳过一些特殊策略组（如DIRECT、REJECT等）
+        if group_name in ["DIRECT", "REJECT", "GLOBAL", "PROXY"]:
             continue
 
         original = group.get("proxies", [])
+        # 保留原有的REJECT和DIRECT规则，添加新节点
         reserved = [p for p in original if p not in ("REJECT", "DIRECT") and p not in valid_names]
         updated = ["REJECT", "DIRECT"] + valid_names + reserved
 
@@ -49,6 +55,7 @@ def inject_groups(config, node_names: list) -> tuple:
 
         injected_total += added
         injected_groups += 1
+        write_log(f"✅ [zc] 已注入策略组 [{group_name}]，添加 {added} 个节点")
 
     config["proxy-groups"] = proxy_groups
     write_log(f"🎯 成功注入 {injected_groups} 个策略组，总计 {injected_total} 个节点，跳过非法节点 {skipped} 个\n")

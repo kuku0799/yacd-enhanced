@@ -7,7 +7,7 @@
 ### 核心脚本
 - `jx.py` - 节点解析器，支持SS、VMess、VLESS、Trojan协议
 - `zw.py` - 节点注入器，将解析的节点注入OpenClash配置
-- `zc.py` - 策略组注入器，自动生成手机002-254的策略组
+- `zc.py` - 策略组注入器，自动识别现有策略组并注入节点
 - `zr.py` - 主控制器，协调整个更新流程
 - `log.py` - 统一日志系统
 - `jk.sh` - 守护进程脚本，监控文件变化
@@ -27,10 +27,11 @@
 - 提供详细的注入统计信息
 
 #### 策略组管理 (`zc.py`)
-- 自动生成手机002-254的策略组
-- 智能节点分配和排序
-- 保持REJECT和DIRECT规则
+- 自动识别现有策略组并注入节点
+- 智能跳过特殊策略组（DIRECT、REJECT、GLOBAL、PROXY）
+- 保持REJECT和DIRECT规则优先级
 - 支持自定义策略组配置
+- 详细的注入日志记录
 
 #### 主控制器 (`zr.py`)
 - MD5文件变化检测
@@ -88,6 +89,16 @@ tail -f /root/OpenClashManage/wangluo/log.txt
 logread | grep openclash
 ```
 
+## 策略组注入说明
+
+脚本会自动识别OpenClash配置文件中的现有策略组，并将解析的节点注入到这些策略组中：
+
+- **自动识别**：扫描所有现有的proxy-groups
+- **智能过滤**：跳过DIRECT、REJECT、GLOBAL、PROXY等特殊策略组
+- **保持规则**：保留原有的REJECT和DIRECT规则优先级
+- **节点去重**：避免重复添加相同节点
+- **详细日志**：记录每个策略组的注入情况
+
 ## 注意事项
 
 1. **权限要求**：脚本需要读写OpenClash配置文件的权限
@@ -95,6 +106,7 @@ logread | grep openclash
 3. **依赖检查**：确保Python3和ruamel.yaml已正确安装
 4. **备份机制**：脚本会自动备份配置文件，建议定期手动备份
 5. **错误处理**：如遇到配置错误，会自动回滚到备份配置
+6. **策略组配置**：确保OpenClash配置中有有效的策略组定义
 
 ## 故障排除
 
@@ -103,6 +115,7 @@ logread | grep openclash
 2. **路径错误**：确认所有路径配置正确
 3. **依赖缺失**：安装所需的Python包
 4. **配置冲突**：检查OpenClash配置文件格式
+5. **策略组为空**：确保配置文件中定义了有效的策略组
 
 ### 调试方法
 1. 查看详细日志：`tail -f /root/OpenClashManage/wangluo/log.txt`
