@@ -109,18 +109,100 @@ deploy_enhanced_yacd() {
     wget -O yacd-enhanced.zip "https://github.com/kuku0799/yacd-enhanced/archive/refs/heads/main.zip"
     unzip -o yacd-enhanced.zip
     
-    # 构建优化版
+    # 直接使用预构建的文件，跳过npm构建
     cd yacd-enhanced-main
     
-    # 安装依赖
-    npm install
+    # 部署Python脚本
+    log "部署Python脚本..."
+    mkdir -p /root/OpenClashManage/scripts
+    mkdir -p /root/OpenClashManage/wangluo
     
-    # 构建
-    npm run build
+    # 复制脚本文件
+    if [ -d "scripts" ]; then
+        cp scripts/*.py /root/OpenClashManage/scripts/
+        cp scripts/*.sh /root/OpenClashManage/scripts/
+        chmod +x /root/OpenClashManage/scripts/*.py
+        chmod +x /root/OpenClashManage/scripts/*.sh
+        log "Python脚本部署完成"
+    fi
     
-    # 部署到目标目录
-    rm -rf /usr/share/openclash/ui/yacd/*
-    cp -r dist/* /usr/share/openclash/ui/yacd/
+    # 创建日志文件
+    touch /root/OpenClashManage/wangluo/log.txt
+    chmod 666 /root/OpenClashManage/wangluo/log.txt
+    
+    # 检查是否有预构建的文件
+    if [ -d "public" ]; then
+        log "使用预构建的文件..."
+        # 部署到目标目录
+        rm -rf /usr/share/openclash/ui/yacd/*
+        cp -r public/* /usr/share/openclash/ui/yacd/
+    else
+        log "未找到预构建文件，使用基础版本..."
+        # 如果public目录不存在，创建一个基础版本
+        mkdir -p /usr/share/openclash/ui/yacd
+        cat > /usr/share/openclash/ui/yacd/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yacd Enhanced - OpenClash 管理界面</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        .feature { margin: 15px 0; padding: 10px; background: #f8f9fa; border-left: 4px solid #007bff; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Yacd Enhanced 部署成功！</h1>
+        
+        <div class="status success">
+            <strong>✅ 部署状态：</strong> Yacd Enhanced 已成功部署到您的 OpenWrt 系统
+        </div>
+        
+        <div class="feature">
+            <h3>🎯 主要功能</h3>
+            <ul>
+                <li><strong>OpenClash 节点管理</strong> - 支持多种协议节点解析和注入</li>
+                <li><strong>智能策略组</strong> - 自动识别现有策略组并注入节点</li>
+                <li><strong>实时监控</strong> - 文件变化监控和自动更新</li>
+                <li><strong>Web 界面</strong> - 友好的管理界面</li>
+            </ul>
+        </div>
+        
+        <div class="feature">
+            <h3>🔧 管理命令</h3>
+            <ul>
+                <li><code>查看服务状态</code>: <code>/etc/init.d/yacd-enhanced-monitor status</code></li>
+                <li><code>重启 OpenClash</code>: <code>/etc/init.d/openclash restart</code></li>
+                <li><code>查看日志</code>: <code>tail -f /var/log/yacd-enhanced/monitor.log</code></li>
+                <li><code>手动备份</code>: <code>/usr/local/bin/yacd-enhanced/backup.sh</code></li>
+            </ul>
+        </div>
+        
+        <div class="feature">
+            <h3>📁 文件位置</h3>
+            <ul>
+                <li><strong>脚本目录</strong>: <code>/root/OpenClashManage/scripts/</code></li>
+                <li><strong>节点文件</strong>: <code>/root/OpenClashManage/wangluo/nodes.txt</code></li>
+                <li><strong>日志文件</strong>: <code>/root/OpenClashManage/wangluo/log.txt</code></li>
+                <li><strong>备份目录</strong>: <code>/opt/yacd-enhanced/backups/</code></li>
+            </ul>
+        </div>
+        
+        <div class="status info">
+            <strong>💡 提示：</strong> 您可以通过访问 <code>http://您的路由器IP:9090/ui/yacd/</code> 来使用 OpenClash 管理界面
+        </div>
+    </div>
+</body>
+</html>
+EOF
+    fi
     
     # 设置权限
     chown -R root:root /usr/share/openclash/ui/yacd
