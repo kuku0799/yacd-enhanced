@@ -1,16 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { NodeManager } from '../../services/openclash/NodeManager';
 
-interface OpenClashMonitorProps {
-  config: {
-    nodesFilePath: string;
-    configFilePath: string;
-    logFilePath: string;
-    interval: number;
-  };
-}
-
-export const OpenClashMonitor: React.FC<OpenClashMonitorProps> = ({ config }) => {
+export const OpenClashMonitor: React.FC = () => {
   const [nodeManager, setNodeManager] = useState<NodeManager | null>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
@@ -20,8 +11,16 @@ export const OpenClashMonitor: React.FC<OpenClashMonitorProps> = ({ config }) =>
     updateCount: 0
   });
 
+  // 默认配置
+  const defaultConfig = {
+    nodesFilePath: '/root/OpenClashManage/wangluo/nodes.txt',
+    configFilePath: '/etc/openclash/config.yaml',
+    logFilePath: '/root/OpenClashManage/wangluo/log.txt',
+    interval: 5
+  };
+
   useEffect(() => {
-    const manager = new NodeManager(config);
+    const manager = new NodeManager(defaultConfig);
     
     manager.on('started', () => setIsRunning(true));
     manager.on('stopped', () => setIsRunning(false));
@@ -40,7 +39,7 @@ export const OpenClashMonitor: React.FC<OpenClashMonitorProps> = ({ config }) =>
     return () => {
       manager.stop();
     };
-  }, [config]);
+  }, []);
 
   const handleStart = async () => {
     if (nodeManager) {
@@ -99,12 +98,20 @@ export const OpenClashMonitor: React.FC<OpenClashMonitorProps> = ({ config }) =>
         </div>
       </div>
 
-      <div className="log-viewer">
-        <h4>实时日志</h4>
-        <div className="log-content">
-          {logs.map((log, index) => (
-            <div key={index} className="log-line">{log}</div>
-          ))}
+      <div className="monitor-logs">
+        <h4>监控日志</h4>
+        <div className="log-container">
+          {logs.length === 0 ? (
+            <p className="no-logs">暂无日志</p>
+          ) : (
+            <div className="log-list">
+              {logs.map((log, index) => (
+                <div key={index} className="log-entry">
+                  {log}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
